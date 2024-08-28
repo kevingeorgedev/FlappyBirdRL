@@ -4,12 +4,15 @@ import torch
 from agent import Agent
 import random
 
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
 device = torch.device(
     "cuda" if torch.cuda.is_available() else
     "cpu"
 )
 
-env = gymnasium.make("FlappyBird-v0", use_lidar=False) # , render_mode="human"
+env = gymnasium.make("FlappyBird-v0", use_lidar=True, render_mode="human") # , render_mode="human"
 n_actions = env.action_space.n
 n_observations = env.observation_space.shape[0]
 print(f"Action space: {n_actions}")
@@ -20,7 +23,7 @@ GAMMA = 0.99
 EXPLORE = 20000
 INITIAL_EPSILON = 0.1
 FINAL_EPSILON = 0.0001
-REPLAY_MEMORY = 1,000,000
+REPLAY_MEMORY = 1000000
 BATCH = 256
 LR = 3e-4
 TRAIN_AFTER = 1024
@@ -37,6 +40,7 @@ epsilon = INITIAL_EPSILON
 #state, _ = env.reset()
 
 agent = Agent(lr=LR, n_obs=n_observations, n_actions=n_actions, gamma=GAMMA, device=device, capacity=REPLAY_MEMORY, seq_length=SEQUENCE_LENGTH)
+print(f"Parameters per Model: {count_parameters(agent.policy)}")
 
 for episode in range(NUM_EPISODES):
     state, _ = env.reset()

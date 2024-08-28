@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from replay import Transition
+from copy import deepcopy
 
 class DuelDQNet(nn.Module):
     def __init__(self, n_observations, n_actions, seq_length, dim) -> None:
@@ -9,7 +10,6 @@ class DuelDQNet(nn.Module):
 
         self.dim = dim
         self.n_actions = n_actions
-        self.n_observations = n_observations
 
         self.projection = nn.Sequential(
             nn.Linear(n_observations, dim), # Projection Layer
@@ -18,47 +18,35 @@ class DuelDQNet(nn.Module):
 
         self.positional_embedding = nn.Parameter(torch.randn(seq_length, dim))
 
-        self.norm = nn.LayerNorm(self.dim)
-        self.attn1 = nn.MultiheadAttention(embed_dim=self.dim, num_heads=8, batch_first=True)
         self.block1 = self._encoder_block()
-
-        self.attn2 = nn.MultiheadAttention(embed_dim=self.dim, num_heads=8, batch_first=True)
         self.block2 = self._encoder_block()
 
-        self.fc_adv = nn.Linear(256, n_actions)
-        self.fc_val = nn.Linear(256, 1)
+        self.fc_adv = nn.Linear(dim, n_actions)
+        self.fc_val = nn.Linear(dim, 1)
 
     def _encoder_block(self):
         return nn.Sequential(
-            nn.Linear(self.dim, self.dim, bias=False),
+            nn.LayerNorm(self.dim),
+            nn.MultiheadAttention(embed_dim=self.dim, num_heads=8, batch_first=True),
+            nn.LayerNorm(self.dim),
+            nn.Linear(self.dim, self.dim),
             nn.GELU(),
-
-            nn.Linear(self.dim, self.dim, bias=False),
-            nn.GELU(),
+            nn.Linear(self.dim, self.dim)
         )
 
     def forward(self, x):
-        x = self.projection(x)
-        x += self.positional_embedding
+        x = self.projection(x) + self.positional_embedding
 
-        x = self.norm(x)
-        x = x.unsqueeze(1)
-        attn_output, _ = self.attn1(x, x, x)
-        x = attn_output.squeeze(1)
-        x = self.norm(x)
-        x = self.block1(x)
-        
-        x = self.norm(x)
-        x = x.unsqueeze(1)
-        attn_output, _ = self.attn2(x, x, x)
-        x = attn_output.squeeze(1)
-        x = self.norm(x)
-        x = self.block1(x)
+        residual1 = x
+        x, _ = self.block1[1](self.block1[0](x).unsqueeze(1), x.unsqueeze(1), x.unsqueeze(1))
+        x = x.squeeze(1) + residual1
 
-        adv: torch.Tensor = self.fc_adv(x)
-        adv = adv.view(-1, self.n_actions)
-        val: torch.Tensor = self.fc_val(x)
-        val = val.view(-1, 1)
+        residual2 = x
+        x, _ = self.block2[1](self.block2[0](x).unsqueeze(1), x.unsqueeze(1), x.unsqueeze(1))
+        x = x.squeeze(1) + residual2
+
+        adv = self.fc_adv(x).view(-1, self.n_actions)
+        val = self.fc_val(x).view(-1, 1)
         
         qval = val + (adv - adv.mean(dim=1, keepdim=True))
         return qval

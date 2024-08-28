@@ -9,8 +9,8 @@ class Agent:
         self.lr = lr
         self.gamma = gamma
         self.device = device
-        self.policy = DuelDQNet(n_observations=n_obs, n_actions=n_actions, seq_length=seq_length).to(device)
-        self.target = DuelDQNet(n_observations=n_obs, n_actions=n_actions, seq_length=seq_length).to(device)
+        self.policy = DuelDQNet(n_observations=n_obs, n_actions=n_actions, seq_length=seq_length, dim=512).to(device)
+        self.target = DuelDQNet(n_observations=n_obs, n_actions=n_actions, seq_length=seq_length, dim=512).to(device)
         self.criterion = nn.MSELoss()
         self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
         self.replay = ReplayMemory(capacity)

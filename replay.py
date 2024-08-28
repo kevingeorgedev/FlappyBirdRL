@@ -22,7 +22,7 @@ class ReplayMemory(object):
 
         for _ in range(batch_size):
             start_idx = random.randint(0, last_idx)
-            sequence = [self.memory[i]['state'] for i in range(start_idx, start_idx + sequence_len)]
+            sequence = [self.memory[i].state for i in range(start_idx, start_idx + sequence_len)]
             batch.append(sequence)
         
         return batch
