@@ -5,7 +5,7 @@ from replay import Transition
 from copy import deepcopy
 
 class DuelDQNet(nn.Module):
-    def __init__(self, n_observations, n_actions, seq_length, dim) -> None:
+    def __init__(self, n_observations, n_actions, max_seq_length, dim) -> None:
         super(DuelDQNet, self).__init__()
 
         self.dim = dim
@@ -16,7 +16,7 @@ class DuelDQNet(nn.Module):
             nn.ReLU()
         )
 
-        self.positional_embedding = nn.Parameter(torch.randn(seq_length, dim))
+        self.positional_embedding = nn.Parameter(torch.randn(max_seq_length, dim))
 
         self.block1 = self._encoder_block()
         self.block2 = self._encoder_block()

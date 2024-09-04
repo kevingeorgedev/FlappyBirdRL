@@ -4,16 +4,23 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+class LogCoshLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, y_t, y_prime_t):
+        ey_t = y_t - y_prime_t
+        return torch.mean(torch.log(torch.cosh(ey_t + 1e-12)))
+
 class Agent:
-    def __init__(self, lr, n_obs, n_actions, gamma, device, capacity, seq_length) -> None:
+    def __init__(self, lr, n_obs, n_actions, gamma, device, seq_length) -> None:
         self.lr = lr
         self.gamma = gamma
         self.device = device
-        self.policy = DuelDQNet(n_observations=n_obs, n_actions=n_actions, seq_length=seq_length, dim=512).to(device)
-        self.target = DuelDQNet(n_observations=n_obs, n_actions=n_actions, seq_length=seq_length, dim=512).to(device)
-        self.criterion = nn.MSELoss()
+        self.policy = DuelDQNet(n_observations=n_obs, n_actions=n_actions, max_seq_length=seq_length, dim=512).to(device)
+        self.target = DuelDQNet(n_observations=n_obs, n_actions=n_actions, max_seq_length=seq_length, dim=512).to(device)
+        self.criterion = LogCoshLoss()
         self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
-        self.replay = ReplayMemory(capacity)
 
     def train(self, batch: Transition):
         states      = torch.stack(batch.state)

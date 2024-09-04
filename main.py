@@ -3,6 +3,7 @@ import gymnasium
 import torch
 from agent import Agent
 import random
+from replay import ReplayMemory
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -29,7 +30,7 @@ LR = 3e-4
 TRAIN_AFTER = 1024
 USE_ATTENTION = True
 MOVING_AVERAGE = 100
-SEQUENCE_LENGTH = 128
+MAX_SEQUENCE_LENGTH = 10000
 
 UPDATE_STEPS = 100
 train_mode = True
@@ -39,18 +40,19 @@ epsilon = INITIAL_EPSILON
 
 #state, _ = env.reset()
 
-agent = Agent(lr=LR, n_obs=n_observations, n_actions=n_actions, gamma=GAMMA, device=device, capacity=REPLAY_MEMORY, seq_length=SEQUENCE_LENGTH)
+agent = Agent(lr=LR, n_obs=n_observations, n_actions=n_actions, gamma=GAMMA, device=device, seq_length=MAX_SEQUENCE_LENGTH)
 print(f"Parameters per Model: {count_parameters(agent.policy)}")
 
 for episode in range(NUM_EPISODES):
     state, _ = env.reset()
     done = False
     reward_e = 0
+    replay = ReplayMemory(REPLAY_MEMORY)
 
     while True:
         env.render()
         if random.random() < epsilon:
-            action = env.action_space.sample() #random.choice([0, 1])
+            action = random.choice([0, 1]) #env.action_space.sample()
         else:
             tensor_state = torch.tensor(state, device=device, dtype=torch.float32).unsqueeze(0)
             action = agent.policy.get_action(tensor_state)
@@ -58,8 +60,9 @@ for episode in range(NUM_EPISODES):
         next_state, reward, done, _, info = env.step(action)
         reward_e += reward
 
-        agent.replay.add(state, action, next_state, reward, done)
-        if len(agent.replay) > TRAIN_AFTER:
+        #replay.add(state, action, next_state, reward, done)
+        replay.add(state)
+        if len(replay) > TRAIN_AFTER:
             if train_mode:
                 print("starting training...")
                 train_mode = False
@@ -67,7 +70,16 @@ for episode in range(NUM_EPISODES):
             if learn_steps % UPDATE_STEPS == 0:
                 agent.target.load_state_dict(agent.policy.state_dict())
 
-            batch = agent.replay.sample(batch_size=BATCH, sequence_len=SEQUENCE_LENGTH)
+            #batch = replay.sample(batch_size=BATCH, sequence_len=MAX_SEQUENCE_LENGTH)
+            seq = replay.memory
+            print(type(seq))
+            #print(replay.memory[0][3])
+            #print(len(batch))
+            #print(len(batch[0]))
+            #print(len(batch[0][0]))
+
+
+
             batch_state, batch_action, batch_next_state, batch_reward, batch_done = zip(*batch)
 
             batch_state = torch.tensor(batch_state, dtype=torch.float32, device=device)
